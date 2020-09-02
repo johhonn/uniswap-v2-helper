@@ -241,3 +241,79 @@ export async function swapTokens(
   // return transaction receipt
   return swapTx
 }
+
+export async function createUnsignedSwapTX(
+  ethersSigner: Signer,
+  inputToken: string,
+  outputToken: string,
+  amount: string,
+  isSellOrder: boolean,
+  { recipient = '', maxSlippage = 100, maxDelay = 60 * 2 },
+): Promise<TransactionReceipt> {
+  // resolve recipient
+  recipient = recipient === '' ? await ethersSigner.getAddress() : recipient
+
+  // get swap params
+  const { amountIn, amountOut, path, deadline } = await getSwapParams(
+    inputToken,
+    outputToken,
+    amount,
+    isSellOrder,
+    {
+      maxSlippage,
+      maxDelay,
+      ethersProvider: ethersSigner.provider,
+    },
+  )
+
+  // format addresses
+  inputToken = ethers.utils.getAddress(inputToken)
+
+  // create contract instances
+  const InputToken = new ethers.Contract(
+    inputToken,
+    IUniswapV2ERC20.abi,
+    ethersSigner,
+  )
+  const UniswapRouter = new ethers.Contract(
+    UniswapRouterAddress,
+    IUniswapV2Router.abi,
+    ethersSigner,
+  )
+
+  // check sufficient balance
+  const balance = await InputToken.balanceOf(await ethersSigner.getAddress())
+  if (balance.lt(amountIn)) {
+    throw new Error('insufficient balance')
+  }
+
+  // check sufficient allowance
+  const allowance = await InputToken.allowance(
+    await ethersSigner.getAddress(),
+    UniswapRouter.address,
+  )
+  if (allowance.lt(amountIn)) {
+    await (await InputToken.approve(UniswapRouter.address, amountIn)).wait()
+  }
+
+  // perform swap
+  const swapTx = (isSellOrder
+    ?  await UniswapRouter.populateTransaction.swapExactTokensForTokens(
+        amountIn,
+        amountOut,
+        path,
+        recipient,
+        deadline,
+      )
+    : await UniswapRouter.populateTransaction.swapTokensForExactTokens(
+        amountOut,
+        amountIn,
+        path,
+        recipient,
+        deadline,
+      ).wait()
+  )
+
+  // return transaction receipt
+  return swapTx
+}
