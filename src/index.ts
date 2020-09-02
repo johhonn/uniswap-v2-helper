@@ -249,7 +249,7 @@ export async function createUnsignedSwapTX(
   amount: string,
   isSellOrder: boolean,
   { recipient = '', maxSlippage = 100, maxDelay = 60 * 2 },
-): Promise<TransactionReceipt> {
+): Promise<any> {
   // resolve recipient
   recipient = recipient === '' ? await ethersSigner.getAddress() : recipient
 
@@ -311,7 +311,7 @@ export async function createUnsignedSwapTX(
         path,
         recipient,
         deadline,
-      ).wait()
+      )
   )
 
   // return transaction receipt
