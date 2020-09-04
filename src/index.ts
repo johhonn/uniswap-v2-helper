@@ -243,7 +243,8 @@ export async function swapTokens(
 }
 
 export async function createUnsignedSwapTX(
-  ethersSigner: Signer,
+  sender:string,
+  provider: Provider,
   inputToken: string,
   outputToken: string,
   amount: string,
@@ -251,7 +252,7 @@ export async function createUnsignedSwapTX(
   { recipient = '', maxSlippage = 100, maxDelay = 60 * 2 },
 ): Promise<any> {
   // resolve recipient
-  recipient = recipient === '' ? await ethersSigner.getAddress() : recipient
+  recipient = recipient === '' ? sender : recipient
 
   // get swap params
   const { amountIn, amountOut, path, deadline } = await getSwapParams(
@@ -262,7 +263,7 @@ export async function createUnsignedSwapTX(
     {
       maxSlippage,
       maxDelay,
-      ethersProvider: ethersSigner.provider,
+      ethersProvider: provider,
     },
   )
 
@@ -273,23 +274,23 @@ export async function createUnsignedSwapTX(
   const InputToken = new ethers.Contract(
     inputToken,
     IUniswapV2ERC20.abi,
-    ethersSigner,
+    provider,
   )
   const UniswapRouter = new ethers.Contract(
     UniswapRouterAddress,
     IUniswapV2Router.abi,
-    ethersSigner,
+    provider,
   )
 
   // check sufficient balance
-  const balance = await InputToken.balanceOf(await ethersSigner.getAddress())
+  const balance = await InputToken.balanceOf(sender)
   if (balance.lt(amountIn)) {
     throw new Error('insufficient balance')
   }
 
   // check sufficient allowance
   const allowance = await InputToken.allowance(
-    await ethersSigner.getAddress(),
+    sender,
     UniswapRouter.address,
   )
   if (allowance.lt(amountIn)) {
